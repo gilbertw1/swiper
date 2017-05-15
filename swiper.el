@@ -85,6 +85,7 @@
 (defvar swiper-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "M-q") 'swiper-query-replace)
+    (define-key map (kbd "M-Q") 'swiper-query-replace-raw)
     (define-key map (kbd "C-l") 'swiper-recenter-top-bottom)
     (define-key map (kbd "C-'") 'swiper-avy)
     (define-key map (kbd "C-7") 'swiper-mc)
@@ -92,20 +93,24 @@
     map)
   "Keymap for swiper.")
 
-(defun swiper-query-replace ()
+(defun swiper-query-replace (&optional raw)
   "Start `query-replace' with string to replace from last search string."
   (interactive)
   (if (null (window-minibuffer-p))
       (user-error "Should only be called in the minibuffer through `swiper-map'")
     (let* ((enable-recursive-minibuffers t)
-           (from (ivy--regex ivy-text))
-           (to (minibuffer-with-setup-hook
+           (from (if raw 
+                   ivy-text
+                   (ivy--regex ivy-text)))
+           (to (if raw
+                 (read-from-minibuffer (format "Query replace %s with: " from))
+                 (minibuffer-with-setup-hook
                    (lambda ()
                      (setq minibuffer-default
                            (if (string-match "\\`\\\\_<\\(.*\\)\\\\_>\\'" ivy-text)
                                (match-string 1 ivy-text)
                              ivy-text)))
-                 (read-from-minibuffer (format "Query replace %s with: " from)))))
+                  (read-from-minibuffer (format "Query replace %s with: " from))))))
       (swiper--cleanup)
       (ivy-exit-with-action
        (lambda (_)
@@ -114,14 +119,22 @@
            (perform-replace from to
                             t t nil)))))))
 
-(defun swiper-all-query-replace ()
+(defun swiper-query-replace-raw ()
+  "Start `query-replace' with string to replace from last raw search string. Useful
+for replacing with regex groups."
+  (interactive)
+  (swiper-query-replace t))
+
+(defun swiper-all-query-replace (&optional raw)
   "Start `query-replace' with string to replace from last search string."
   (interactive)
   (if (null (window-minibuffer-p))
       (user-error
        "Should only be called in the minibuffer through `swiper-all-map'")
     (let* ((enable-recursive-minibuffers t)
-           (from (ivy--regex ivy-text))
+           (from (if raw
+                   ivy-text
+                   (ivy--regex ivy-text)))
            (to (query-replace-read-to from "Query replace" t)))
       (swiper--cleanup)
       (ivy-exit-with-action
@@ -135,6 +148,12 @@
                     (goto-char (point-min))
                     (perform-replace from to t t nil)))
              (set-window-configuration wnd-conf))))))))
+
+(defun swiper-all-query-replace-raw ()
+  "Start `query-replace' with string to replace from last raw search string. Useful
+for replacing with regex groups."
+  (interactive)
+  (swiper-all-query-replace t))
 
 (defvar avy-background)
 (defvar avy-all-windows)
@@ -886,6 +905,7 @@ Run `swiper' for those buffers."
 (defvar swiper-all-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "M-q") 'swiper-all-query-replace)
+    (define-key map (kbd "M-Q") 'swiper-all-query-replace-raw)
     map)
   "Keymap for `swiper-all'.")
 
